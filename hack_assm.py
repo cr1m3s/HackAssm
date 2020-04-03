@@ -25,6 +25,9 @@ dest = {'null': '000', 'M': '001', 'D': '010', 'MD': '011',
 jump = {'null': '000', 'JGT': '001', 'JEQ': '010', 'JGE': '011',
         'JLT': '100', 'JNE': '101', 'JLE': '110', 'JMP': '111'}
 
+predef_symbols = {'SCREEN': 16384, 'KBD': 24576, 'SP': 0, 'LCL': 1,
+                  'ARG': 2, 'THIS': 3, 'THAT': 4}
+
 result = ''
 content = []
 
@@ -45,27 +48,49 @@ def binary_repr(num):
     return result[::-1]
 
 
+def symbol_code(symbol):
+    if symbol[0] == 'R':
+        number = symbol[1::]
+        if int(number) > 15:
+            print("HAL supports only R0..R15, not a  R{0}".format(number))
+            sys.exit()
+        return binary_repr(number)
+    elif symbol in predef_symbols:
+        return binary_repr(predef_symbols[symbol])
+    else:
+        return binary_repr(symbol)
+
+
 def op_code(instr):
     op_set = instr.split("=")
     result = '111' + compute[op_set[1]] + dest[op_set[0]] + jump['null']
     return result
 
 
+def read_labels(lines):
+    result = {}
+    inst_counter = 1
+    for sub_line in lines:
+        if sub_line[0] == '(':
+            result.update({sub_line[1:-1]: binary_repr(inst_counter)})
+        inst_counter += 1
+    return result
+
+
+result = ''
+label_symbols = read_labels(non_empty_lines)
 for line in non_empty_lines:
-    if line[0] != '/':
-        if line[0] in "0@":
-            if line[1] == "R":
-                number = line[2::]
-                if int(number) > 15:
-                    print("HAL supports only  R0..R15, {0}".format(number))
-                    sys.exit()
-                result += binary_repr(line[2::])
+    line = line.strip()
+    if line[0] not in '(/':
+        if line[0] == "@":
+            symbol = line[1::]
+            if symbol in label_symbols:
+                result += str(label_symbols[symbol])
             else:
-                result += binary_repr(line[1::])
+                result += str(symbol_code(symbol))
         else:
             result += op_code(line)
         result += '\n'
-
 print(result)
 hack_filename = filename.split('.')[0] + '.hack'
 hack_file = open(hack_filename, "w")
