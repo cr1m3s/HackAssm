@@ -54,7 +54,14 @@ def op_code(instr):
 for line in non_empty_lines:
     if line[0] != '/':
         if line[0] in "0@":
-            result += binary_repr(line[1::])
+            if line[1] == "R":
+                number = line[2::]
+                if int(number) > 15:
+                    print("HAL supports only  R0..R15, {0}".format(number))
+                    sys.exit()
+                result += binary_repr(line[2::])
+            else:
+                result += binary_repr(line[1::])
         else:
             result += op_code(line)
         result += '\n'
