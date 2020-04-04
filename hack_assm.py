@@ -2,11 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import sys
-filename = sys.argv[1]
-file_format = filename.split(".")[1]
-if file_format != "asm":
-    print("Wrong file format!")
-    sys.exit()
 
 compute = {'0': '0101010', '1': '0111111', '-1': '0111010',
            'D': '0001100', 'A': '0110000', '!D': '0001101',
@@ -28,15 +23,6 @@ jump = {'null': '000', 'JGT': '001', 'JEQ': '010', 'JGE': '011',
 predef_symbols = {'SCREEN': 16384, 'KBD': 24576, 'SP': 0, 'LCL': 1,
                   'ARG': 2, 'THIS': 3, 'THAT': 4}
 
-result = ''
-content = []
-
-with open(filename) as f:
-    content = f.read()
-all_lines = content.split("\n")
-non_empty_lines = [line for line in all_lines if line.strip() != ""]
-f.close()
-
 
 def binary_repr(num):
     result = ''
@@ -47,18 +33,8 @@ def binary_repr(num):
     result += (16-len(result))*'0'
     return result[::-1]
 
-
-def symbol_code(symbol):
-    if symbol[0] == 'R':
-        number = symbol[1::]
-        if int(number) > 15:
-            print("HAL supports only R0..R15, not a  R{0}".format(number))
-            sys.exit()
-        return binary_repr(number)
-    elif symbol in predef_symbols:
-        return binary_repr(predef_symbols[symbol])
-    else:
-        return binary_repr(symbol)
+# possible instructions : a-, c-instructions
+# simple solution for c-instructions, not works for jump instructions
 
 
 def op_code(instr):
@@ -67,31 +43,76 @@ def op_code(instr):
     return result
 
 
-def read_labels(lines):
+# a-instructions starts with 0[Nx15]
+# a-instruction could be @number, @variable, @r[0..15],
+# (LOOP)-depends from position where appears
+# i.e. number of line for the next instruction
+# @variable equals to 16+
+# c-instructions starts with 111[a[cx6][dx3][jx3]]
+
+def read_symbols(lines):
     result = {}
-    inst_counter = 1
-    for sub_line in lines:
-        if sub_line[0] == '(':
-            result.update({sub_line[1:-1]: binary_repr(inst_counter)})
-        inst_counter += 1
+    counter = 0
+    for line in lines:
+        if line[0] == '(':
+            result.update({line[1:-1]: counter})
+        else:
+            counter += 1
     return result
 
 
+# check file format
+filename = sys.argv[1]
+file_format = filename.split(".")[1]
+if file_format != "asm":
+    print("Wrong file format!")
+    sys.exit()
+
+# read file content and remove whitespaces
+content = []
+with open(filename) as f:
+    content = f.read()
+all_lines = content.split("\n")
+non_empty_lines = [line for line in all_lines
+                   if line.strip() != "" and line[0] != '/']
+f.close()
+
+# parse lines and prepare string for output
 result = ''
-label_symbols = read_labels(non_empty_lines)
+label_symbols = read_symbols(non_empty_lines)
+variables = {}
+mem_count = 16
 for line in non_empty_lines:
     line = line.strip()
-    if line[0] not in '(/':
-        if line[0] == "@":
-            symbol = line[1::]
-            if symbol in label_symbols:
-                result += str(label_symbols[symbol])
+    if line[0] == '@':
+        subline = line[1:]
+        if subline in label_symbols:
+            result += binary_repr(label_symbols[subline])
+        elif subline in predef_symbols:
+            result += binary_repr(predef_symbols[subline])
+        elif subline.isnumeric():
+            result += binary_repr(subline)
+        elif subline in variables:
+            result += binary_repr(variables[subline])
+        elif subline[0] == 'R':
+            if int(subline[1:]) < 15:
+                result += binary_repr(subline[1:])
             else:
-                result += str(symbol_code(symbol))
+                print("Register with number > 15 not allowed:  {0}"
+                      .format(subline[1:]))
+        elif subline in variables:
+            result += variables[subline]
         else:
-            result += op_code(line)
+            variables.update({subline: mem_count})
+            mem_count += 1
+            result += binary_repr(variables[subline])
+        result += '\n'
+    elif line[0] != '(':
+        result += line
         result += '\n'
 print(result)
+
+# write result into the .hack file with same name as .asm file
 hack_filename = filename.split('.')[0] + '.hack'
 hack_file = open(hack_filename, "w")
 hack_file.write(result)
