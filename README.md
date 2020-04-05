@@ -1,5 +1,7 @@
 Assembler for Hack Assembly Language
+
 Tested with examples from the **[course](https://www.nand2tetris.org/project06)**.
+
 Steps of implementation:
 
 <li>Handling Instructions</li>
