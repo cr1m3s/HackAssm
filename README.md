@@ -11,6 +11,7 @@
   <ol>
     <li>default symbols</li>
     <li>user variables</li>
+  </ol>
 </ol>
 
 
