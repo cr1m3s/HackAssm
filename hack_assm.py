@@ -61,6 +61,11 @@ def read_symbols(lines):
     return result
 
 
+def comment_remove(line):
+    line = line.split('/')[0].strip()
+    return line
+
+
 # check file format
 filename = sys.argv[1]
 file_format = filename.split(".")[1]
@@ -84,36 +89,57 @@ variables = {}
 mem_count = 16
 for line in non_empty_lines:
     line = line.strip()
+    if '/' in line:
+        line = comment_remove(line)
+
     if line[0] == '@':
+        # only a-instructions starts with @
         subline = line[1:]
         if subline in label_symbols:
+            # replaced @JUMP instructions (XXX)
             result += binary_repr(label_symbols[subline])
         elif subline in predef_symbols:
+            # parse predefine symbols
             result += binary_repr(predef_symbols[subline])
         elif subline.isnumeric():
+            # parse simple numbers
             result += binary_repr(subline)
         elif subline in variables:
+            # parse variables created by user
             result += binary_repr(variables[subline])
         elif subline[0] == 'R':
-            if int(subline[1:]) < 15:
+            # parse registers call
+            if int(subline[1:]) <= 15:
                 result += binary_repr(subline[1:])
             else:
                 print("Register with number > 15 not allowed:  {0}"
                       .format(subline[1:]))
-        elif subline in variables:
-            result += variables[subline]
         else:
+            # left only case when variable occures first time
+            # add new variable to variables list
+            # and to result
+            # value depends on mem_address counter and starts with 16
             variables.update({subline: mem_count})
             mem_count += 1
             result += binary_repr(variables[subline])
         result += '\n'
     elif line[0] != '(':
-        result += line
+        # parser for 2 tipes of c-instructions
+        if ';' in line:
+            # jump instructions
+            subline = line.split(';')
+            result += '111' + compute[subline[0]]\
+                + dest['null'] + jump[subline[1]]
+        elif '=' in line:
+            # value assigment
+            subline = line.split('=')
+            result += '111' + compute[subline[1]]\
+                + dest[subline[0]] + jump['null']
         result += '\n'
-print(result)
 
 # write result into the .hack file with same name as .asm file
 hack_filename = filename.split('.')[0] + '.hack'
 hack_file = open(hack_filename, "w")
 hack_file.write(result)
+print("{0} translated\n{1} file created".format(filename, hack_filename))
 hack_file.close()
